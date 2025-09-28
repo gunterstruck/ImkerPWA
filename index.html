@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Aufgabenplaner</title>
+    <!-- Tailwind CSS CDN für schnelles, modernes Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Verknüpfung zum PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <style>
+        /* Setzt die Schriftart für die gesamte App */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Helles Grau */
+        }
+        /* Definiert eine saubere Box für die PWA-Ansicht */
+        #app-container {
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body class="flex justify-center min-h-screen p-4 sm:p-8">
+
+    <div id="app-container" class="w-full bg-white shadow-2xl rounded-xl p-6 md:p-10">
+        <h1 class="text-3xl font-bold text-indigo-700 mb-6 text-center">
+            PWA Aufgabenplaner
+        </h1>
+
+        <!-- Eingabebereich für neue Aufgaben -->
+        <div class="flex flex-col sm:flex-row gap-3 mb-8 p-4 bg-indigo-50 rounded-lg shadow-inner">
+            <input 
+                type="text" 
+                id="task-input" 
+                placeholder="Neue Aufgabe hier eingeben..."
+                class="flex-grow p-3 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 outline-none text-gray-700"
+            >
+            <button 
+                id="add-task-btn"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+                Hinzufügen
+            </button>
+        </div>
+
+        <!-- Aufgabenliste -->
+        <div id="task-list" class="space-y-4">
+            <!-- Aufgaben werden hier von JavaScript eingefügt -->
+            <p id="empty-message" class="text-center text-gray-500 italic">Noch keine Aufgaben. Fügen Sie eine hinzu!</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Globaler Zustand und Elemente
+        const taskInput = document.getElementById('task-input');
+        const addTaskBtn = document.getElementById('add-task-btn');
+        const taskList = document.getElementById('task-list');
+        const emptyMessage = document.getElementById('empty-message');
+
+        // Initialisierung
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Service Worker registrieren
+            registerServiceWorker();
+            // 2. Aufgaben laden und anzeigen
+            loadTasks();
+
+            // Event Listener hinzufügen
+            addTaskBtn.addEventListener('click', addTask);
+            taskInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addTask();
+                }
+            });
+            // Delegierte Event Listener für Aktionen in der Liste
+            taskList.addEventListener('click', handleTaskAction);
+        });
+
+        /**
+         * Registriert den Service Worker, falls der Browser dies unterstützt.
+         */
+        function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('service-worker.js')
+                        .then(registration => {
+                            console.log('Service Worker registriert mit Scope:', registration.scope);
+                        })
+                        .catch(err => {
+                            console.error('Service Worker Registrierung fehlgeschlagen:', err);
+                        });
+                });
+            } else {
+                console.log('Service Worker wird von diesem Browser nicht unterstützt.');
+            }
+        }
+
+        /**
+         * Ruft Aufgaben aus dem localStorage ab.
+         * @returns {Array<Object>} Die Liste der Aufgaben.
+         */
+        function getTasks() {
+            const tasksJson = localStorage.getItem('tasks');
+            // Stellt sicher, dass ein Array zurückgegeben wird
+            return tasksJson ? JSON.parse(tasksJson) : []; 
+        }
+
+        /**
+         * Speichert die Aufgabenliste im localStorage.
+         * @param {Array<Object>} tasks - Die zu speichernde Aufgabenliste.
+         */
+        function saveTasks(tasks) {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            renderTasks(tasks); // Neu rendern nach dem Speichern
+        }
+
+        /**
+         * Fügt eine neue Aufgabe zur Liste hinzu.
+         */
+        function addTask() {
+            const text = taskInput.value.trim();
+            if (text === '') {
+                // Zeigt einen temporären visuellen Hinweis an
+                taskInput.classList.add('border-red-500', 'ring-red-500');
+                setTimeout(() => {
+                    taskInput.classList.remove('border-red-500', 'ring-red-500');
+                }, 1000);
+                return;
+            }
+
+            const tasks = getTasks();
+            const newTask = {
+                id: Date.now(), // Eindeutige ID
+                text: text,
+                completed: false,
+                date: new Date().toLocaleDateString('de-DE')
+            };
+
+            tasks.push(newTask);
+            saveTasks(tasks);
+            
+            taskInput.value = ''; // Eingabefeld leeren
+        }
+        
+        /**
+         * Behandelt das Klicken auf die Schaltflächen "Erledigt" und "Löschen".
+         * @param {Event} e - Das Klick-Ereignis.
+         */
+        function handleTaskAction(e) {
+            const target = e.target;
+            const taskElement = target.closest('.task-item');
+            if (!taskElement) return;
+
+            const taskId = parseInt(taskElement.dataset.taskId);
+            let tasks = getTasks();
+
+            if (target.classList.contains('toggle-complete')) {
+                tasks = tasks.map(task => 
+                    task.id === taskId ? { ...task, completed: !task.completed } : task
+                );
+                saveTasks(tasks);
+            } else if (target.classList.contains('delete-task')) {
+                tasks = tasks.filter(task => task.id !== taskId);
+                saveTasks(tasks);
+            }
+        }
+
+
+        /**
+         * Lädt die Aufgaben und zeigt sie an.
+         */
+        function loadTasks() {
+            const tasks = getTasks();
+            renderTasks(tasks);
+        }
+
+        /**
+         * Rendert die Aufgabenliste im DOM neu.
+         * @param {Array<Object>} tasks - Die Aufgabenliste.
+         */
+        function renderTasks(tasks) {
+            taskList.innerHTML = ''; // Liste leeren
+            
+            if (tasks.length === 0) {
+                emptyMessage.classList.remove('hidden');
+                return;
+            }
+            
+            emptyMessage.classList.add('hidden');
+
+            tasks.forEach(task => {
+                const isCompleted = task.completed;
+                const taskItem = document.createElement('div');
+                taskItem.className = `task-item flex items-center justify-between p-4 rounded-lg shadow-md transition duration-200 ease-in-out ${isCompleted ? 'bg-green-100 border-l-4 border-green-500' : 'bg-white border-l-4 border-indigo-400 hover:shadow-lg'}`;
+                taskItem.dataset.taskId = task.id;
+
+                // Inhalt: Text und Datum
+                const content = `
+                    <div class="flex-1 min-w-0 mr-4">
+                        <p class="text-lg font-medium ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-800'} break-words">
+                            ${task.text}
+                        </p>
+                        <span class="text-xs text-gray-400">${task.date}</span>
+                    </div>
+                `;
+                
+                // Aktionen: Buttons
+                const actions = `
+                    <div class="flex space-x-2">
+                        <!-- Erledigt/Unerledigt Button -->
+                        <button class="toggle-complete p-2 rounded-full transition duration-150 ease-in-out"
+                            aria-label="${isCompleted ? 'Als unerledigt markieren' : 'Als erledigt markieren'}">
+                            ${isCompleted 
+                                ? '<svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path class="pointer-events-none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
+                                : '<svg class="w-6 h-6 text-indigo-600 hover:text-indigo-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path class="pointer-events-none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
+                            }
+                        </button>
+
+                        <!-- Löschen Button -->
+                        <button class="delete-task p-2 rounded-full text-red-500 hover:bg-red-100 transition duration-150 ease-in-out"
+                            aria-label="Aufgabe löschen">
+                            <svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                `;
+
+                taskItem.innerHTML = content + actions;
+                taskList.appendChild(taskItem);
+            });
+        }
+    </script>
+</body>
+</html>
