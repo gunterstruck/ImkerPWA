@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PWA Aufgabenplaner</title>
+    <title>PWA Aufgabenplaner & Wetter</title>
     <!-- Tailwind CSS CDN für schnelles, modernes Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -25,10 +25,36 @@
 
     <div id="app-container" class="w-full bg-white shadow-2xl rounded-xl p-6 md:p-10">
         <h1 class="text-3xl font-bold text-indigo-700 mb-6 text-center">
-            PWA Aufgabenplaner
+            PWA Aufgabenplaner & Wetter
         </h1>
+        
+        <!-- WETTER-KONFIGURATION UND ANZEIGE -->
+        <div class="mb-8 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold text-yellow-800 mb-4">Wetterstation einstellen</h2>
+            
+            <!-- Eingabe für die Stadt -->
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <input 
+                    type="text" 
+                    id="city-input" 
+                    placeholder="Neue Stadt eingeben (z.B. München)..."
+                    class="flex-grow p-2 border border-yellow-200 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150 outline-none text-gray-700"
+                >
+                <button 
+                    id="change-city-btn"
+                    class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
+                >
+                    Wetter laden
+                </button>
+            </div>
 
-        <!-- Eingabebereich für neue Aufgaben -->
+            <!-- Wetteranzeige -->
+            <div id="weather-display" class="text-gray-700 mt-4 pt-4 border-t border-yellow-200">
+                <p class="text-center italic text-gray-500" id="weather-loading">Lade Wetterdaten...</p>
+            </div>
+        </div>
+
+        <!-- Eingabebereich für neue Aufgaben (unverändert) -->
         <div class="flex flex-col sm:flex-row gap-3 mb-8 p-4 bg-indigo-50 rounded-lg shadow-inner">
             <input 
                 type="text" 
@@ -44,9 +70,8 @@
             </button>
         </div>
 
-        <!-- Aufgabenliste -->
+        <!-- Aufgabenliste (unverändert) -->
         <div id="task-list" class="space-y-4">
-            <!-- Aufgaben werden hier von JavaScript eingefügt -->
             <p id="empty-message" class="text-center text-gray-500 italic">Noch keine Aufgaben. Fügen Sie eine hinzu!</p>
         </div>
 
@@ -58,13 +83,27 @@
         const addTaskBtn = document.getElementById('add-task-btn');
         const taskList = document.getElementById('task-list');
         const emptyMessage = document.getElementById('empty-message');
+        const weatherDisplay = document.getElementById('weather-display');
+        const weatherLoading = document.getElementById('weather-loading');
+        // Neue Elemente für die Stadteingabe
+        const cityInput = document.getElementById('city-input');
+        const changeCityBtn = document.getElementById('change-city-btn');
 
+        // Konstanten für die Wetter-API
+        const WEATHER_API_KEY = '86f3db49701e49975bc9a9b7c02257db'; 
+        const DEFAULT_CITY = 'Berlin'; // Fallback-Stadt für das Wetter
+        
         // Initialisierung
         document.addEventListener('DOMContentLoaded', () => {
             // 1. Service Worker registrieren
             registerServiceWorker();
             // 2. Aufgaben laden und anzeigen
             loadTasks();
+            
+            // 3. Wetterdaten laden: Lade die zuletzt gespeicherte Stadt (oder den Standardwert)
+            const savedCity = localStorage.getItem('weatherCity') || DEFAULT_CITY;
+            cityInput.value = savedCity; // Zeigt die geladene Stadt im Feld an
+            fetchWeatherData(savedCity); 
 
             // Event Listener hinzufügen
             addTaskBtn.addEventListener('click', addTask);
@@ -73,9 +112,124 @@
                     addTask();
                 }
             });
-            // Delegierte Event Listener für Aktionen in der Liste
             taskList.addEventListener('click', handleTaskAction);
+            
+            // NEU: Stadt ändern
+            changeCityBtn.addEventListener('click', changeCity);
+            cityInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    changeCity();
+                }
+            });
         });
+
+        // ----------------------------------------------------
+        // WETTER-FUNKTIONEN
+        // ----------------------------------------------------
+
+        /**
+         * Verarbeitet die Eingabe der neuen Stadt, speichert sie und ruft die Daten ab.
+         */
+        function changeCity() {
+            const newCity = cityInput.value.trim();
+            if (newCity) {
+                // Speichert die neue Stadt im localStorage
+                localStorage.setItem('weatherCity', newCity);
+                fetchWeatherData(newCity);
+            } else {
+                // Gibt Feedback, wenn das Feld leer ist
+                cityInput.classList.add('border-red-500', 'ring-red-500');
+                setTimeout(() => {
+                    cityInput.classList.remove('border-red-500', 'ring-red-500');
+                }, 1000);
+            }
+        }
+
+        /**
+         * Ruft Wetterdaten von OpenWeatherMap ab und aktualisiert die Anzeige.
+         * @param {string} city - Die Stadt, deren Wetterdaten abgerufen werden sollen.
+         */
+        async function fetchWeatherData(city) {
+            weatherLoading.classList.remove('hidden'); // Ladeanzeige einblenden
+            weatherDisplay.innerHTML = ''; // Vorherige Daten löschen
+
+            weatherLoading.textContent = `Lade Wetterdaten für ${city}...`;
+
+            try {
+                // Ersetzen Sie Leerzeichen in der Stadt für die API-Anfrage
+                const cityQuery = encodeURIComponent(city.split(',')[0].trim()); 
+                const apiUrl = `https://api.openweathermap.org/data/2.5/weather?q=${cityQuery}&units=metric&lang=de&appid=${WEATHER_API_KEY}`;
+                
+                // Fetch mit Exponential Backoff für Robustheit
+                const maxRetries = 3;
+                let response;
+                
+                for (let i = 0; i < maxRetries; i++) {
+                    response = await fetch(apiUrl);
+                    if (response.ok) {
+                        break;
+                    }
+                    if (i < maxRetries - 1) {
+                        const delay = Math.pow(2, i) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP-Fehler! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderWeather(data);
+
+            } catch (error) {
+                console.error('Fehler beim Abrufen der Wetterdaten:', error);
+                weatherLoading.classList.add('hidden');
+                weatherDisplay.innerHTML = `
+                    <p class="text-red-600 font-semibold text-center mt-2">
+                        Konnte Wetterdaten für "${city}" nicht laden.
+                        Bitte stellen Sie sicher, dass der Name korrekt ist.
+                    </p>
+                `;
+            }
+        }
+
+        /**
+         * Rendert die Wetterdaten im DOM.
+         * @param {Object} data - Die Wetterdaten von der API.
+         */
+        function renderWeather(data) {
+            weatherLoading.classList.add('hidden'); // Ladeanzeige ausblenden
+
+            // Symbole von OpenWeatherMap abrufen
+            const iconCode = data.weather[0].icon || '01d';
+            const iconUrl = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+            
+            const temp = Math.round(data.main.temp);
+            const humidity = data.main.humidity;
+            const description = data.weather[0].description;
+            const windSpeed = (data.wind.speed * 3.6).toFixed(1); // von m/s in km/h
+
+            weatherDisplay.innerHTML = `
+                <div class="flex items-center space-x-4">
+                    <img src="${iconUrl}" alt="${description}" class="w-16 h-16 flex-shrink-0">
+                    <div>
+                        <p class="text-2xl font-bold text-gray-800">${data.name}</p>
+                        <p class="text-4xl font-light text-gray-800">${temp}°C</p>
+                    </div>
+                    <div class="ml-auto text-sm text-gray-600 space-y-1 text-right">
+                        <p class="capitalize">${description}</p>
+                        <p>Luftfeuchte: ${humidity}%</p>
+                        <p>Wind: ${windSpeed} km/h</p>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // ----------------------------------------------------
+        // PWA & AUFGABEN-FUNKTIONEN (unverändert)
+        // ----------------------------------------------------
 
         /**
          * Registriert den Service Worker, falls der Browser dies unterstützt.
