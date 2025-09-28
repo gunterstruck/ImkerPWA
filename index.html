@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PWA Aufgabenplaner & Wetter</title>
+  <title>Bienen-KI-Assistent & Protokoll</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#4f46e5">
   <link rel="icon" href="icon-192.png">
@@ -13,43 +13,84 @@
     /* Animation für das Laden */
     .animate-spin-fast { animation: spin 0.5s linear infinite; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    /* Stil für erledigte Aufgaben */
-    .task-done { text-decoration: line-through; color: #6b7280; }
+    /* Icon für den Bienenstock */
+    .colony-icon { font-size: 24px; color: #facc15; /* Gelb wie Honig */ }
+    /* Stil für das Mikrofon */
+    #mic-button { transition: transform 0.1s; }
+    #mic-button.listening { 
+        background-color: #ef4444; /* Rot beim Zuhören */
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
   </style>
 </head>
 <body class="flex justify-center min-h-screen p-4 sm:p-8">
   <div id="app-container" class="w-full max-w-xl bg-white shadow-2xl rounded-xl p-6 md:p-10">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold text-indigo-700">PWA Aufgabenplaner & Wetter</h1>
+      <h1 class="text-2xl font-bold text-yellow-700">Bienen-KI-Assistent & Protokoll</h1>
       <div>
         <button id="install-btn" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded transition duration-200">App installieren</button>
       </div>
     </div>
 
-    <p class="text-sm text-gray-600 mb-4">Hinweis: Für die Installation muss die Seite über <strong>https</strong> bereitgestellt oder lokal über <code>localhost</code> laufen.</p>
+    <p class="text-sm text-gray-600 mb-4">Ihr sprachgesteuerter Assistent für alle Fragen rund um die Imkerei.</p>
 
+    <!-- NEU: KI-ASSISTENT SEKTION -->
+    <div class="mb-8 p-4 bg-indigo-50 border-2 border-indigo-300 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold text-indigo-700 mb-4">Fragen Sie Ihren Imker-Assistenten 💬</h2>
+        <div id="chat-status" class="text-center mb-4 text-indigo-600 italic">Klicken Sie auf das Mikrofon, um zu sprechen.</div>
+        
+        <div id="chat-output" class="min-h-[60px] p-3 mb-4 bg-white rounded-lg border border-gray-200 shadow-inner">
+            <p class="text-gray-500 italic text-sm">Transkript und Antwort der KI erscheinen hier.</p>
+        </div>
+
+        <div class="flex justify-center">
+            <button id="mic-button" class="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-xl focus:outline-none focus:ring-4 focus:ring-indigo-300 transform transition duration-150 ease-in-out">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                    <path d="M8.25 4.5a3.75 3.75 0 1 1 7.5 0v8.25a3.75 3.75 0 1 1-7.5 0V4.5z" />
+                    <path d="M15.75 17.25a6 6 0 0 1-6-6v-1.5a.75.75 0 0 0-1.5 0v1.5a7.5 7.5 0 0 0 15 0v-1.5a.75.75 0 0 0-1.5 0v1.5a6 6 0 0 1-6 6z" />
+                </svg>
+            </button>
+        </div>
+    </div>
+    <!-- ENDE: KI-ASSISTENT SEKTION -->
+
+
+    <!-- WETTER-SEKTION -->
     <div class="mb-8 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-md">
       <h2 class="text-xl font-semibold text-yellow-800 mb-4">Wetterstation einstellen</h2>
-      <!-- NEU: flex-col auf Mobile, dann sm:flex-row auf größeren Bildschirmen -->
       <div class="flex flex-col sm:flex-row gap-3 mb-4">
-        <!-- NEU: w-full auf Mobile, sm:flex-grow auf größeren Bildschirmen -->
         <input id="city-input" class="w-full sm:flex-grow p-2 border rounded focus:ring-yellow-500 focus:border-yellow-500" placeholder="Stadt (z.B. Berlin)">
-        <!-- NEU: w-full auf Mobile, sm:w-auto auf größeren Bildschirmen -->
         <button id="change-city-btn" class="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition duration-200">Wetter laden</button>
       </div>
       <button id="get-location-btn" class="w-full bg-yellow-300 hover:bg-yellow-400 text-yellow-900 py-2 rounded mb-4 transition duration-200">Meinen Standort verwenden</button>
       <div id="bee-warning" class="hidden p-3 mb-4 rounded-lg font-medium text-center shadow-lg bg-red-100 text-red-800 border border-red-300"></div>
       <div id="weather-display" class="min-h-[50px]"><p id="weather-loading" class="italic text-gray-500">Lade Wetterdaten...</p></div>
     </div>
+    
+    <!-- VÖLKER-VERWALTUNG -->
+    <div class="p-4 border-2 border-indigo-200 rounded-lg shadow-md bg-indigo-50">
+      <h2 class="text-xl font-semibold text-indigo-700 mb-4">Völker-Verwaltung</h2>
+      
+      <!-- Neues Volk hinzufügen -->
+      <div class="flex flex-col gap-3 mb-6 p-4 bg-white rounded-lg border border-indigo-300 shadow-sm">
+          <input id="colony-name-input" class="w-full p-2 border rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="Volksname/ID (z.B. Standort Nord-A)">
+          <div class="flex flex-col sm:flex-row gap-3">
+              <input id="colony-race-input" class="w-full sm:flex-grow p-2 border rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="Rasse (z.B. Carnica)">
+              <button id="add-colony-btn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded transition duration-200">Volk hinzufügen</button>
+          </div>
+      </div>
 
-    <!-- NEU: flex-col auf Mobile, dann sm:flex-row auf größeren Bildschirmen -->
-    <div class="flex flex-col sm:flex-row gap-3 mb-8">
-      <!-- NEU: w-full auf Mobile, sm:flex-grow auf größeren Bildschirmen -->
-      <input id="task-input" class="w-full sm:flex-grow p-3 border rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="Neue Aufgabe...">
-      <!-- NEU: w-full auf Mobile, sm:w-auto auf größeren Bildschirmen -->
-      <button id="add-task-btn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded transition duration-200">Hinzufügen</button>
+      <!-- Liste der Völker -->
+      <div id="colony-list" class="space-y-3">
+          <p id="empty-colony-message" class="text-gray-500 italic text-center">Noch keine Völker erfasst.</p>
+      </div>
     </div>
-    <div id="task-list" class="space-y-4"><p id="empty-message" class="text-gray-500 italic">Noch keine Aufgaben.</p></div>
   </div>
 
 <script>
@@ -57,13 +98,14 @@
 const WEATHER_API_KEY = "86f3db49701e49975bc9a9b7c02257db"; // API-Schlüssel eingefügt
 const WEATHER_API_URL = "https://api.openweathermap.org/data/2.5/weather";
 const DEFAULT_CITY = 'Berlin';
-const TASK_STORAGE_KEY = 'pwa_tasks';
+const COLONY_STORAGE_KEY = 'pwa_colonies'; 
 const WEATHER_CITY_KEY = 'pwa_last_city';
+// NEUER GEMINI API-SCHLÜSSEL
+const GEMINI_API_KEY = "AIzaSyCXBbolB6gXHaPV93KTKF4aKc2gVp_7wqk"; 
 
-// --- SERVICE WORKER & PWA INSTALLATION ---
+// --- SERVICE WORKER & PWA INSTALLATION (Unverändert) ---
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Stellen Sie sicher, dass der Pfad stimmt, hier wird angenommen, dass der SW im Root liegt
     navigator.serviceWorker.register('./service-worker.js')
       .then(r => console.log('SW registered', r.scope))
       .catch(e => console.error('SW reg failed', e));
@@ -88,131 +130,160 @@ installBtn.addEventListener('click', async () => {
 });
 
 
-// --- AUFGABEN-LOGIK ---
-const taskInput = document.getElementById('task-input');
-const addTaskBtn = document.getElementById('add-task-btn');
-const taskList = document.getElementById('task-list');
-const emptyMessage = document.getElementById('empty-message');
+// --- VÖLKER-LOGIK (Unverändert) ---
+const colonyNameInput = document.getElementById('colony-name-input');
+const colonyRaceInput = document.getElementById('colony-race-input');
+const addColonyBtn = document.getElementById('add-colony-btn');
+const colonyList = document.getElementById('colony-list');
+const emptyColonyMessage = document.getElementById('empty-colony-message');
 
-/** Holt Aufgaben aus dem localStorage */
-function getTasks(){ return JSON.parse(localStorage.getItem(TASK_STORAGE_KEY) || '[]'); }
-
-/** Speichert Aufgaben und rendert die Liste neu */
-function saveTasks(t){ 
-  localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(t)); 
-  renderTasks(t); 
+function getColonies(){ 
+    return JSON.parse(localStorage.getItem(COLONY_STORAGE_KEY) || '[]'); 
 }
 
-/** Fügt eine neue Aufgabe hinzu */
-function addTask(){ 
-  const t = taskInput.value.trim(); 
-  if(!t) return; 
-  const tasks = getTasks(); 
-  // Verwenden von Date.now() als einfache ID
-  tasks.push({id: Date.now(), text: t, done: false}); 
-  saveTasks(tasks); 
-  taskInput.value = ''; 
+function saveColonies(c){ 
+    localStorage.setItem(COLONY_STORAGE_KEY, JSON.stringify(c)); 
+    renderColonies(c); 
 }
 
-/** Markiert eine Aufgabe als erledigt oder unerledigt */
-function toggleTask(id) {
-    const tasks = getTasks();
-    const taskIndex = tasks.findIndex(t => t.id === id);
-    if (taskIndex > -1) {
-        tasks[taskIndex].done = !tasks[taskIndex].done;
-        saveTasks(tasks);
+function addColony(){ 
+    const name = colonyNameInput.value.trim(); 
+    const race = colonyRaceInput.value.trim() || 'Unbekannt'; 
+    if(!name) return; 
+    
+    const colonies = getColonies(); 
+    colonies.push({
+        id: Date.now(), 
+        name: name, 
+        race: race,
+        lastInspection: 'Noch keine',
+        notes: []
+    }); 
+    saveColonies(colonies); 
+    colonyNameInput.value = ''; 
+    colonyRaceInput.value = '';
+}
+
+function deleteColony(id) {
+    // ACHTUNG: confirm() wird in der Sandbox nicht angezeigt. 
+    // Für eine echte PWA müsste dies durch ein benutzerdefiniertes Modal ersetzt werden.
+    if (confirm(`Sind Sie sicher, dass Sie dieses Volk (ID: ${id}) löschen möchten?`)) {
+        saveColonies(getColonies().filter(c => c.id !== id));
     }
 }
 
-/** Rendert die Aufgabenliste */
-function renderTasks(tasks){ 
-  taskList.innerHTML = ''; 
-  if(tasks.length === 0){ 
-    emptyMessage.classList.remove('hidden'); 
+function renderColonies(colonies){ 
+  colonyList.innerHTML = ''; 
+  if(colonies.length === 0){ 
+    emptyColonyMessage.classList.remove('hidden'); 
     return; 
   } 
-  emptyMessage.classList.add('hidden'); 
-  tasks.forEach(task => { 
+  emptyColonyMessage.classList.add('hidden'); 
+  
+  colonies.forEach(colony => { 
     const div = document.createElement('div'); 
-    const doneClass = task.done ? 'task-done' : '';
-    const checkIcon = task.done ? '✅' : '⚪';
-
-    // Stil für die Aufgabe
-    div.className = 'p-3 bg-gray-50 border border-indigo-200 rounded-lg flex justify-between items-center transition duration-200 hover:shadow-md'; 
+    div.className = 'p-3 bg-white border border-yellow-400 rounded-lg flex justify-between items-center transition duration-200 hover:shadow-lg'; 
     div.innerHTML = `
-      <div data-id="${task.id}" class="toggle-task flex items-center cursor-pointer flex-grow min-w-0 pr-4">
-        <span class="text-xl mr-3">${checkIcon}</span>
-        <span class="text-gray-800 truncate ${doneClass}">${task.text}</span>
+      <div class="flex items-center flex-grow min-w-0 pr-4">
+        <span class="colony-icon mr-3">🐝</span>
+        <div>
+          <span class="text-lg font-semibold text-gray-900 truncate">${colony.name}</span>
+          <p class="text-sm text-gray-500">Rasse: ${colony.race}</p>
+          <p class="text-xs text-gray-400">Letzte Prüfung: ${colony.lastInspection}</p>
+        </div>
       </div>
-      <button data-id="${task.id}" class="del text-red-500 hover:text-red-700 font-medium transition duration-200 flex-shrink-0">Löschen</button>
+      <button data-id="${colony.id}" class="del-colony text-red-500 hover:text-red-700 font-medium transition duration-200 flex-shrink-0 p-1 rounded-full hover:bg-red-100">
+        🗑️
+      </button>
     `;
-    taskList.appendChild(div); 
+    colonyList.appendChild(div); 
   }); 
 }
 
-// Event Listener für Aufgaben
-addTaskBtn.addEventListener('click', addTask);
-taskInput.addEventListener('keypress', (e) => {
+addColonyBtn.addEventListener('click', addColony);
+colonyNameInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        addTask();
+        addColony();
     }
 });
-taskList.addEventListener('click', (e) => { 
-  const target = e.target.closest('button.del, div.toggle-task');
+colonyList.addEventListener('click', (e) => { 
+  const target = e.target.closest('button.del-colony');
   if (!target) return;
 
   const id = Number(target.dataset.id); 
-
-  if(target.classList.contains('del')){ 
-    // Löschen-Funktion
-    saveTasks(getTasks().filter(t => t.id !== id)); 
-  } else if (target.classList.contains('toggle-task')) {
-    // Erledigt/Unerledigt-Funktion
-    toggleTask(id);
-  }
+  deleteColony(id);
 });
 
 
-// --- WETTER-LOGIK ---
+// --- WETTER-LOGIK (Unverändert) ---
 const cityInput = document.getElementById('city-input');
 const changeCityBtn = document.getElementById('change-city-btn');
 const getLocationBtn = document.getElementById('get-location-btn');
 const weatherDisplay = document.getElementById('weather-display');
-const weatherLoading = document.getElementById('weather-loading');
 const beeWarning = document.getElementById('bee-warning');
 
-/** Rendert die Wetterdaten in der Anzeige */
+function getBeeAdvice(temp, wind, desc) {
+    if (temp < 8) {
+        return '🥶 Kalt: Die Bienen bleiben im Stock. Heute ist kein Ausflugwetter.';
+    }
+    if (temp >= 15 && temp < 25) {
+        if (wind < 20 && !desc.includes('regen') && !desc.includes('schauer')) {
+            return '☀️ Optimales Flugwetter! Beste Bedingungen für die Sammelbienen.';
+        }
+    }
+    if (temp >= 25 && temp <= 30) {
+        return '🥵 Warm: Gute Tracht zu erwarten. Achten Sie auf ausreichende Belüftung im Stock!';
+    }
+    if (temp > 30) {
+        return '🔥 Sehr heiß! Hitzestress droht. Die Bienen benötigen dringend Wasser und Schatten.';
+    }
+    if (desc.includes('regen') || desc.includes('schauer')) {
+        return '🌧️ Regen: Die Bienen bleiben zu Hause. Nutzen Sie die Zeit für Arbeiten im Haus.';
+    }
+    if (wind > 25) {
+        return '💨 Achtung, windig! Bei starkem Wind fliegen Bienen ungern. Flugbetrieb ist eingeschränkt.';
+    }
+    if (temp >= 8) {
+        return '☁️ Okayes Wetter. Kontrollflug ist möglich. Behalten Sie den Himmel im Auge.';
+    }
+    return 'Wetterdaten sind da, aber keine spezifische Bienen-Empfehlung.';
+}
+
 function renderWeather(data) {
+  const temp = Math.round(data.main.temp);
+  const windSpeed = Math.round(data.wind.speed * 3.6); 
+  const description = data.weather[0].description.toLowerCase();
+  
+  const beeAdvice = getBeeAdvice(temp, windSpeed, description);
+
   weatherDisplay.innerHTML = `
-    <div class="flex items-center space-x-4">
+    <div class="flex items-center space-x-4 mb-3">
       <img src="https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png" alt="${data.weather[0].description}" class="w-16 h-16">
       <div>
-        <p class="text-3xl font-bold text-gray-900">${Math.round(data.main.temp)}°C</p>
+        <p class="text-3xl font-bold text-gray-900">${temp}°C</p>
         <p class="text-lg text-gray-700">${data.name}, ${data.sys.country}</p>
-        <p class="text-sm text-gray-600">${data.weather[0].description.charAt(0).toUpperCase() + data.weather[0].description.slice(1)}</p>
+        <p class="text-sm text-gray-600">${data.weather[0].description.charAt(0).toUpperCase() + data.weather[0].description.slice(1)} | Wind: ${windSpeed} km/h</p>
       </div>
+    </div>
+    <div class="p-3 bg-yellow-100 text-yellow-800 rounded-lg border border-yellow-400 font-medium">
+        ${beeAdvice}
     </div>
   `;
 
-  // Bienen-Warnung (Beispiel für > 30°C Hitze)
-  if (data.main.temp > 30) {
-    // LaTeX-Formatierung für Grad Celsius
-    beeWarning.innerHTML = '<strong>Hitzewarnung:</strong> Über $30\text{°C}$! Bitte auf die Bienen achten und Wasser bereitstellen.';
+  if (temp > 30) {
+    beeWarning.innerHTML = '<strong>Hitzewarnung:</strong> Über $30\text{°C}$! Bitte auf die Bienen achten und Wasser bereitstellen. 💧🐝';
     beeWarning.classList.remove('hidden');
   } else {
     beeWarning.classList.add('hidden');
   }
 }
 
-/** Zeigt eine Fehlermeldung an */
 function displayError(message) {
   weatherDisplay.innerHTML = `<p class="text-red-600 font-semibold p-2 bg-red-50 rounded">${message}</p>`;
   beeWarning.classList.add('hidden');
 }
 
-/** Holt Wetterdaten von der API */
 async function fetchWeather(query) {
-  
   weatherDisplay.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin-fast rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500"></div></div>';
 
   let url;
@@ -223,7 +294,6 @@ async function fetchWeather(query) {
     url = `${WEATHER_API_URL}?lat=${query.lat}&lon=${query.lon}&appid=${WEATHER_API_KEY}&units=metric&lang=de`;
     localStorage.removeItem(WEATHER_CITY_KEY);
   } else {
-    // Fallback auf Standardstadt, wenn keine Stadt oder Koordinaten angegeben sind.
     fetchWeather({ city: DEFAULT_CITY });
     return; 
   }
@@ -243,7 +313,6 @@ async function fetchWeather(query) {
   }
 }
 
-/** Wetter per Stadtname ändern */
 function handleCityChange() {
   const city = cityInput.value.trim();
   if (city) {
@@ -252,7 +321,6 @@ function handleCityChange() {
   }
 }
 
-/** Wetter per Geolocation laden */
 function handleGeolocation() {
   weatherDisplay.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin-fast rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500"></div></div>';
   
@@ -266,14 +334,12 @@ function handleGeolocation() {
       },
       (error) => {
         console.error('Geolocation Fehler:', error);
-        // Hinzugefügt: Ladeanzeige entfernen und Fehlermeldung anzeigen
         displayError('Standort konnte nicht abgerufen werden. Bitte geben Sie manuell eine Stadt ein.');
       },
-      // NEU: Optionen, um Timeout und Genauigkeit festzulegen
       {
-        timeout: 10000,         // Maximale Wartezeit von 10 Sekunden
-        maximumAge: 60000,      // Akzeptiere einen 1 Minute alten Cache
-        enableHighAccuracy: true // Versuch, eine genauere Position zu erhalten
+        timeout: 10000,         
+        maximumAge: 60000,      
+        enableHighAccuracy: true 
       }
     );
   } else {
@@ -281,7 +347,6 @@ function handleGeolocation() {
   }
 }
 
-// Event Listener für Wetter
 changeCityBtn.addEventListener('click', handleCityChange);
 cityInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
@@ -290,12 +355,231 @@ cityInput.addEventListener('keypress', (e) => {
 });
 getLocationBtn.addEventListener('click', handleGeolocation);
 
+
+// --- KI-ASSISTENT LOGIK (NEU) ---
+const micButton = document.getElementById('mic-button');
+const chatStatus = document.getElementById('chat-status');
+const chatOutput = document.getElementById('chat-output');
+
+// Check, ob der Browser Speech Recognition unterstützt
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognitionAvailable = !!SpeechRecognition;
+
+if (!recognitionAvailable) {
+    chatStatus.textContent = '❌ Sprachbefehle werden von Ihrem Browser nicht unterstützt.';
+    micButton.disabled = true;
+}
+
+// Hilfsfunktionen für TTS
+function base64ToArrayBuffer(base64) {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+function pcmToWav(pcm16, sampleRate) {
+    const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+    const view = new DataView(buffer);
+    
+    // RIFF identifier 'RIFF'
+    view.setUint32(0, 0x52494646, false);
+    // file length
+    view.setUint32(4, 36 + pcm16.length * 2, true);
+    // RIFF type 'WAVE'
+    view.setUint32(8, 0x57415645, false);
+    // format chunk identifier 'fmt '
+    view.setUint32(12, 0x666d7420, false);
+    // format chunk length
+    view.setUint32(16, 16, true);
+    // sample format (1 = PCM)
+    view.setUint16(20, 1, true);
+    // number of channels
+    view.setUint16(22, 1, true);
+    // sample rate
+    view.setUint32(24, sampleRate, true);
+    // byte rate (sample rate * block align)
+    view.setUint32(28, sampleRate * 2, true);
+    // block align (num channels * bytes per sample)
+    view.setUint16(32, 2, true);
+    // bits per sample
+    view.setUint16(34, 16, true);
+    // data chunk identifier 'data'
+    view.setUint32(36, 0x64617461, false);
+    // data chunk length
+    view.setUint32(40, pcm16.length * 2, true);
+
+    let offset = 44;
+    for (let i = 0; i < pcm16.length; i++, offset += 2) {
+        view.setInt16(offset, pcm16[i], true);
+    }
+    
+    return new Blob([buffer], { type: 'audio/wav' });
+}
+
+// Funktion zur Wiedergabe von Audio (TTS)
+async function playTtsAudio(text) {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const payload = {
+        contents: [{
+            parts: [{ text: text }]
+        }],
+        generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: "Rasalgethi" } // Eine klare, informative Stimme
+                }
+            }
+        },
+        model: "gemini-2.5-flash-preview-tts"
+    };
+
+    chatStatus.textContent = '🗣️ Antwort wird vorgelesen...';
+    
+    try {
+        let response;
+        // Einfacher Retry-Mechanismus (Exponential Backoff)
+        for (let i = 0; i < 3; i++) {
+            response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) break;
+            if (i < 2) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i))); // 1s, 2s, 4s Wartezeit
+        }
+        if (!response.ok) throw new Error('TTS API Fehler nach mehreren Versuchen.');
+
+        const result = await response.json();
+        const part = result?.candidates?.[0]?.content?.parts?.[0];
+        const audioData = part?.inlineData?.data;
+        const mimeType = part?.inlineData?.mimeType;
+
+        if (audioData && mimeType && mimeType.startsWith("audio/")) {
+            const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+            const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000;
+            
+            const pcmData = base64ToArrayBuffer(audioData);
+            const pcm16 = new Int16Array(pcmData);
+            
+            const wavBlob = pcmToWav(pcm16, sampleRate);
+            const audioUrl = URL.createObjectURL(wavBlob);
+            
+            const audio = new Audio(audioUrl);
+            audio.play();
+            
+            audio.onended = () => {
+                chatStatus.textContent = '✅ Antwort abgeschlossen. Neue Frage stellen.';
+            };
+        } else {
+            throw new Error('Ungültige oder fehlende Audio-Daten in der TTS-Antwort.');
+        }
+
+    } catch (e) {
+        console.error("TTS Fehler:", e);
+        chatStatus.textContent = `❌ TTS Fehler: Konnte Antwort nicht vorlesen. ${e.message}`;
+    }
+}
+
+
+// Funktion zur Abfrage der KI (LLM)
+async function fetchGeminiResponse(query) {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
+    
+    // Den aktuellen Wetterstatus hinzufügen, um die KI kontextuell zu machen
+    const currentAdvice = document.querySelector('#weather-display .p-3.bg-yellow-100')?.textContent.trim() || 'Aktuelle Wetterdaten sind unbekannt.';
+    
+    const systemPrompt = `Du bist ein freundlicher, erfahrener und praxisorientierter Imker-Experte. Antworte kurz, prägnant und direkt auf die Frage des Nutzers. Beziehe dich bei Entscheidungen (z.B. Kontrollen, Füttern) auf die aktuelle Wetterlage. Aktuelle Imker-Wetterlage: "${currentAdvice}".`;
+    
+    const payload = {
+        contents: [{ parts: [{ text: query }] }],
+        tools: [{ "google_search": {} }],
+        systemInstruction: {
+            parts: [{ text: systemPrompt }]
+        },
+    };
+
+    chatStatus.textContent = '🧠 Denke nach und suche nach Imker-Wissen...';
+    
+    try {
+        let response;
+        // Einfacher Retry-Mechanismus
+        for (let i = 0; i < 3; i++) {
+            response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) break;
+            if (i < 2) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+        }
+        if (!response.ok) throw new Error('Gemini API Fehler nach mehreren Versuchen.');
+
+        const result = await response.json();
+        const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (responseText) {
+            chatOutput.innerHTML = `
+                <p class="font-bold text-gray-700 mb-2">Ihre Frage: "${query}"</p>
+                <p class="text-indigo-800">${responseText}</p>
+            `;
+            await playTtsAudio(responseText);
+        } else {
+            throw new Error('KI hat keine Textantwort geliefert.');
+        }
+
+    } catch (e) {
+        console.error("Gemini Fehler:", e);
+        chatStatus.textContent = `❌ KI-Fehler: Konnte keine Antwort generieren. ${e.message}`;
+    }
+}
+
+// Funktion zur Steuerung der Sprachaufnahme
+function startSpeechRecognition() {
+    if (!recognitionAvailable) return;
+    
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'de-DE';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    micButton.classList.add('listening');
+    chatStatus.textContent = '🔴 Höre zu... Jetzt sprechen...';
+    chatOutput.innerHTML = '<p class="text-gray-500 italic text-sm">Transkribiere Ihre Stimme...</p>';
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        chatStatus.textContent = '🔊 Transkription abgeschlossen. Sende an KI...';
+        fetchGeminiResponse(transcript);
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech Recognition Error:', event.error);
+        chatStatus.textContent = `❌ Sprachfehler: ${event.error}. Versuchen Sie es erneut.`;
+        micButton.classList.remove('listening');
+    };
+
+    recognition.onend = () => {
+        micButton.classList.remove('listening');
+        if (chatStatus.textContent.includes('Höre zu')) {
+             chatStatus.textContent = '⏳ Aufnahme beendet. Warte auf KI-Antwort...';
+        }
+    };
+    
+    recognition.start();
+}
+
+micButton.addEventListener('click', startSpeechRecognition);
+
+
 // --- INITIALISIERUNG ---
 document.addEventListener('DOMContentLoaded', () => {
-  // Aufgaben laden
-  renderTasks(getTasks());
-
-  // Wetter beim Start laden (zuletzt gespeicherte Stadt oder Standard)
+  renderColonies(getColonies());
   const lastCity = localStorage.getItem(WEATHER_CITY_KEY);
   fetchWeather({ city: lastCity || DEFAULT_CITY });
 });
