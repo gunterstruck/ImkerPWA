@@ -1,14 +1,14 @@
-// Verbessertes Service Worker mit Offline-Fallback und Cache-Versioning
-const CACHE_NAME = 'pwa-task-v2';
-const OFFLINE_URL = '/offline.html';
+const CACHE_NAME = 'pwa-single-v1';
+const OFFLINE_URL = 'offline.html';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/offline.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/maskable-icon.png'
+  './',
+  'index.html',
+  'offline.html',
+  'manifest.json',
+  'service-worker.js',
+  'icon-192.png',
+  'icon-512.png',
+  'maskable-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,19 +29,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(networkResp => {
-        // optional: cache new GET responses from same-origin
         if (networkResp && networkResp.status === 200 && networkResp.type === 'basic') {
-          const respClone = networkResp.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, respClone));
+          const clone = networkResp.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return networkResp;
       }).catch(() => {
-        // Wenn alles fehlschlägt, liefere Offline-Seite bei HTML-Navigationsanfragen
         if (event.request.mode === 'navigate' || (event.request.headers.get('accept')||'').includes('text/html')) {
           return caches.match(OFFLINE_URL);
         }
