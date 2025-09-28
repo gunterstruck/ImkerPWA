@@ -13,6 +13,8 @@
     /* Animation für das Laden */
     .animate-spin-fast { animation: spin 0.5s linear infinite; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    /* Stil für erledigte Aufgaben */
+    .task-done { text-decoration: line-through; color: #6b7280; }
   </style>
 </head>
 <body class="flex justify-center min-h-screen p-4 sm:p-8">
@@ -28,18 +30,24 @@
 
     <div class="mb-8 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-md">
       <h2 class="text-xl font-semibold text-yellow-800 mb-4">Wetterstation einstellen</h2>
-      <div class="flex gap-3 mb-4">
-        <input id="city-input" class="flex-grow p-2 border rounded focus:ring-yellow-500 focus:border-yellow-500" placeholder="Stadt (z.B. Berlin)">
-        <button id="change-city-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition duration-200">Wetter laden</button>
+      <!-- NEU: flex-col auf Mobile, dann sm:flex-row auf größeren Bildschirmen -->
+      <div class="flex flex-col sm:flex-row gap-3 mb-4">
+        <!-- NEU: w-full auf Mobile, sm:flex-grow auf größeren Bildschirmen -->
+        <input id="city-input" class="w-full sm:flex-grow p-2 border rounded focus:ring-yellow-500 focus:border-yellow-500" placeholder="Stadt (z.B. Berlin)">
+        <!-- NEU: w-full auf Mobile, sm:w-auto auf größeren Bildschirmen -->
+        <button id="change-city-btn" class="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition duration-200">Wetter laden</button>
       </div>
       <button id="get-location-btn" class="w-full bg-yellow-300 hover:bg-yellow-400 text-yellow-900 py-2 rounded mb-4 transition duration-200">Meinen Standort verwenden</button>
       <div id="bee-warning" class="hidden p-3 mb-4 rounded-lg font-medium text-center shadow-lg bg-red-100 text-red-800 border border-red-300"></div>
       <div id="weather-display" class="min-h-[50px]"><p id="weather-loading" class="italic text-gray-500">Lade Wetterdaten...</p></div>
     </div>
 
-    <div class="flex gap-3 mb-8">
-      <input id="task-input" class="flex-grow p-3 border rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="Neue Aufgabe...">
-      <button id="add-task-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded transition duration-200">Hinzufügen</button>
+    <!-- NEU: flex-col auf Mobile, dann sm:flex-row auf größeren Bildschirmen -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-8">
+      <!-- NEU: w-full auf Mobile, sm:flex-grow auf größeren Bildschirmen -->
+      <input id="task-input" class="w-full sm:flex-grow p-3 border rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="Neue Aufgabe...">
+      <!-- NEU: w-full auf Mobile, sm:w-auto auf größeren Bildschirmen -->
+      <button id="add-task-btn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded transition duration-200">Hinzufügen</button>
     </div>
     <div id="task-list" class="space-y-4"><p id="empty-message" class="text-gray-500 italic">Noch keine Aufgaben.</p></div>
   </div>
@@ -55,7 +63,10 @@ const WEATHER_CITY_KEY = 'pwa_last_city';
 // --- SERVICE WORKER & PWA INSTALLATION ---
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').then(r => console.log('SW registered', r.scope)).catch(e => console.error('SW reg failed', e));
+    // Stellen Sie sicher, dass der Pfad stimmt, hier wird angenommen, dass der SW im Root liegt
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(r => console.log('SW registered', r.scope))
+      .catch(e => console.error('SW reg failed', e));
   });
 }
 
@@ -103,6 +114,16 @@ function addTask(){
   taskInput.value = ''; 
 }
 
+/** Markiert eine Aufgabe als erledigt oder unerledigt */
+function toggleTask(id) {
+    const tasks = getTasks();
+    const taskIndex = tasks.findIndex(t => t.id === id);
+    if (taskIndex > -1) {
+        tasks[taskIndex].done = !tasks[taskIndex].done;
+        saveTasks(tasks);
+    }
+}
+
 /** Rendert die Aufgabenliste */
 function renderTasks(tasks){ 
   taskList.innerHTML = ''; 
@@ -113,11 +134,17 @@ function renderTasks(tasks){
   emptyMessage.classList.add('hidden'); 
   tasks.forEach(task => { 
     const div = document.createElement('div'); 
+    const doneClass = task.done ? 'task-done' : '';
+    const checkIcon = task.done ? '✅' : '⚪';
+
     // Stil für die Aufgabe
     div.className = 'p-3 bg-gray-50 border border-indigo-200 rounded-lg flex justify-between items-center transition duration-200 hover:shadow-md'; 
     div.innerHTML = `
-      <span class="text-gray-800">${task.text}</span>
-      <button data-id="${task.id}" class="del text-red-500 hover:text-red-700 font-medium transition duration-200">Löschen</button>
+      <div data-id="${task.id}" class="toggle-task flex items-center cursor-pointer flex-grow min-w-0 pr-4">
+        <span class="text-xl mr-3">${checkIcon}</span>
+        <span class="text-gray-800 truncate ${doneClass}">${task.text}</span>
+      </div>
+      <button data-id="${task.id}" class="del text-red-500 hover:text-red-700 font-medium transition duration-200 flex-shrink-0">Löschen</button>
     `;
     taskList.appendChild(div); 
   }); 
@@ -131,10 +158,17 @@ taskInput.addEventListener('keypress', (e) => {
     }
 });
 taskList.addEventListener('click', (e) => { 
-  // Löschen-Funktion
-  if(e.target.classList.contains('del')){ 
-    const id = Number(e.target.dataset.id); 
+  const target = e.target.closest('button.del, div.toggle-task');
+  if (!target) return;
+
+  const id = Number(target.dataset.id); 
+
+  if(target.classList.contains('del')){ 
+    // Löschen-Funktion
     saveTasks(getTasks().filter(t => t.id !== id)); 
+  } else if (target.classList.contains('toggle-task')) {
+    // Erledigt/Unerledigt-Funktion
+    toggleTask(id);
   }
 });
 
@@ -162,6 +196,7 @@ function renderWeather(data) {
 
   // Bienen-Warnung (Beispiel für > 30°C Hitze)
   if (data.main.temp > 30) {
+    // LaTeX-Formatierung für Grad Celsius
     beeWarning.innerHTML = '<strong>Hitzewarnung:</strong> Über $30\text{°C}$! Bitte auf die Bienen achten und Wasser bereitstellen.';
     beeWarning.classList.remove('hidden');
   } else {
@@ -177,7 +212,6 @@ function displayError(message) {
 
 /** Holt Wetterdaten von der API */
 async function fetchWeather(query) {
-  // Der API-Key Check ist hier nicht mehr nötig, da der Schlüssel nun eingesetzt ist.
   
   weatherDisplay.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin-fast rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500"></div></div>';
 
@@ -189,7 +223,9 @@ async function fetchWeather(query) {
     url = `${WEATHER_API_URL}?lat=${query.lat}&lon=${query.lon}&appid=${WEATHER_API_KEY}&units=metric&lang=de`;
     localStorage.removeItem(WEATHER_CITY_KEY);
   } else {
-    return; // Nichts zu tun
+    // Fallback auf Standardstadt, wenn keine Stadt oder Koordinaten angegeben sind.
+    fetchWeather({ city: DEFAULT_CITY });
+    return; 
   }
 
   try {
@@ -230,7 +266,14 @@ function handleGeolocation() {
       },
       (error) => {
         console.error('Geolocation Fehler:', error);
+        // Hinzugefügt: Ladeanzeige entfernen und Fehlermeldung anzeigen
         displayError('Standort konnte nicht abgerufen werden. Bitte geben Sie manuell eine Stadt ein.');
+      },
+      // NEU: Optionen, um Timeout und Genauigkeit festzulegen
+      {
+        timeout: 10000,         // Maximale Wartezeit von 10 Sekunden
+        maximumAge: 60000,      // Akzeptiere einen 1 Minute alten Cache
+        enableHighAccuracy: true // Versuch, eine genauere Position zu erhalten
       }
     );
   } else {
