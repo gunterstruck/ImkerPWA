@@ -1,95 +1,51 @@
-// Name des Caches. Erhöhen Sie diese Versionsnummer, um den Cache zu aktualisieren.
-const CACHE_NAME = 'pwa-task-v1';
-
-// Dateien, die beim ersten Besuch sofort im Cache gespeichert werden sollen
-const urlsToCache = [
-    '.', // Die Startseite (index.html)
-    'index.html',
-    'manifest.json',
-    // Hier können Sie bei Bedarf weitere lokale Assets hinzufügen
+// Verbessertes Service Worker mit Offline-Fallback und Cache-Versioning
+const CACHE_NAME = 'pwa-task-v2';
+const OFFLINE_URL = '/offline.html';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/offline.html',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/maskable-icon.png'
 ];
 
-// -------------------------------------------------------------------------
-// INSTALL-EVENT: Cache öffnen und statische Assets hinzufügen
-// -------------------------------------------------------------------------
 self.addEventListener('install', (event) => {
-    // Erzwingt, dass der neue Service Worker sofort die Kontrolle übernimmt
-    self.skipWaiting(); 
-    
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('Service Worker: Statische Assets gecacht');
-                return cache.addAll(urlsToCache);
-            })
-            .catch(error => {
-                console.error('Service Worker: Fehler beim Caching statischer Assets', error);
-            })
-    );
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS_TO_CACHE))
+  );
 });
 
-// -------------------------------------------------------------------------
-// ACTIVATE-EVENT: Alte Caches aufräumen
-// -------------------------------------------------------------------------
 self.addEventListener('activate', (event) => {
-    console.log('Service Worker: Aktiviert und bereit für die Kontrolle über Clients');
-    event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cacheName) => {
-                    if (cacheName !== CACHE_NAME) {
-                        console.log('Service Worker: Lösche alten Cache', cacheName);
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        })
-    );
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+    ))
+  );
+  self.clients.claim();
 });
 
-// -------------------------------------------------------------------------
-// FETCH-EVENT: Abfangen von Netzwerkanfragen für Offline-Funktionalität
-// -------------------------------------------------------------------------
 self.addEventListener('fetch', (event) => {
-    // Nur GET-Anfragen behandeln
-    if (event.request.method !== 'GET') {
-        return;
-    }
+  if (event.request.method !== 'GET') return;
 
-    event.respondWith(
-        caches.match(event.request)
-            .then((response) => {
-                // Cache-Hit: Antwort aus dem Cache zurückgeben
-                if (response) {
-                    return response;
-                }
-                
-                // Cache-Miss: Gehe zum Netzwerk
-                return fetch(event.request)
-                    .then((networkResponse) => {
-                        // Überprüfen, ob eine gültige Antwort erhalten wurde
-                        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-                            return networkResponse;
-                        }
-
-                        // Wichtig: Klonen Sie die Antwort.
-                        // Ein Response-Stream kann nur einmal gelesen werden.
-                        const responseToCache = networkResponse.clone();
-
-                        // Neue Anfrage zum Cache hinzufügen, falls erfolgreich
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
-                                cache.put(event.request, responseToCache);
-                            });
-
-                        return networkResponse;
-                    })
-                    .catch((error) => {
-                        // Fängt Netzwerkfehler ab (z.B. wenn offline)
-                        console.error('Service Worker: Fetch fehlgeschlagen; Offline-Fallback nicht gefunden.', error);
-                        // Optional: Hier könnten Sie eine Offline-Seite zurückgeben
-                        // return caches.match('offline.html');
-                    });
-            })
-    );
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(networkResp => {
+        // optional: cache new GET responses from same-origin
+        if (networkResp && networkResp.status === 200 && networkResp.type === 'basic') {
+          const respClone = networkResp.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, respClone));
+        }
+        return networkResp;
+      }).catch(() => {
+        // Wenn alles fehlschlägt, liefere Offline-Seite bei HTML-Navigationsanfragen
+        if (event.request.mode === 'navigate' || (event.request.headers.get('accept')||'').includes('text/html')) {
+          return caches.match(OFFLINE_URL);
+        }
+      });
+    })
+  );
 });
