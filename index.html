@@ -8,14 +8,19 @@
   <meta name="theme-color" content="#4f46e5">
   <link rel="icon" href="icon-192.png">
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;padding:1rem;background:#f0f4f8}</style>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial; padding: 1rem; background: #f0f4f8; }
+    /* Animation für das Laden */
+    .animate-spin-fast { animation: spin 0.5s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
 </head>
 <body class="flex justify-center min-h-screen p-4 sm:p-8">
   <div id="app-container" class="w-full max-w-xl bg-white shadow-2xl rounded-xl p-6 md:p-10">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold text-indigo-700">PWA Aufgabenplaner & Wetter</h1>
       <div>
-        <button id="install-btn" class="hidden bg-indigo-600 text-white px-3 py-1 rounded">App installieren</button>
+        <button id="install-btn" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded transition duration-200">App installieren</button>
       </div>
     </div>
 
@@ -24,22 +29,30 @@
     <div class="mb-8 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-md">
       <h2 class="text-xl font-semibold text-yellow-800 mb-4">Wetterstation einstellen</h2>
       <div class="flex gap-3 mb-4">
-        <input id="city-input" class="flex-grow p-2 border rounded" placeholder="Stadt (z.B. Berlin)">
-        <button id="change-city-btn" class="bg-yellow-600 text-white px-4 rounded">Wetter laden</button>
+        <input id="city-input" class="flex-grow p-2 border rounded focus:ring-yellow-500 focus:border-yellow-500" placeholder="Stadt (z.B. Berlin)">
+        <button id="change-city-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition duration-200">Wetter laden</button>
       </div>
-      <button id="get-location-btn" class="w-full bg-yellow-300 text-yellow-900 py-2 rounded mb-4">Meinen Standort verwenden</button>
-      <div id="bee-warning" class="hidden p-3 mb-4 rounded-lg font-medium text-center shadow-lg"></div>
-      <div id="weather-display"><p id="weather-loading" class="italic text-gray-500">Lade Wetterdaten...</p></div>
+      <button id="get-location-btn" class="w-full bg-yellow-300 hover:bg-yellow-400 text-yellow-900 py-2 rounded mb-4 transition duration-200">Meinen Standort verwenden</button>
+      <div id="bee-warning" class="hidden p-3 mb-4 rounded-lg font-medium text-center shadow-lg bg-red-100 text-red-800 border border-red-300"></div>
+      <div id="weather-display" class="min-h-[50px]"><p id="weather-loading" class="italic text-gray-500">Lade Wetterdaten...</p></div>
     </div>
 
     <div class="flex gap-3 mb-8">
-      <input id="task-input" class="flex-grow p-3 border rounded" placeholder="Neue Aufgabe...">
-      <button id="add-task-btn" class="bg-indigo-600 text-white px-4 rounded">Hinzufügen</button>
+      <input id="task-input" class="flex-grow p-3 border rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="Neue Aufgabe...">
+      <button id="add-task-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded transition duration-200">Hinzufügen</button>
     </div>
     <div id="task-list" class="space-y-4"><p id="empty-message" class="text-gray-500 italic">Noch keine Aufgaben.</p></div>
   </div>
 
 <script>
+// --- KONSTANTEN UND VARIABLEN ---
+const WEATHER_API_KEY = "86f3db49701e49975bc9a9b7c02257db"; // API-Schlüssel eingefügt
+const WEATHER_API_URL = "https://api.openweathermap.org/data/2.5/weather";
+const DEFAULT_CITY = 'Berlin';
+const TASK_STORAGE_KEY = 'pwa_tasks';
+const WEATHER_CITY_KEY = 'pwa_last_city';
+
+// --- SERVICE WORKER & PWA INSTALLATION ---
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').then(r => console.log('SW registered', r.scope)).catch(e => console.error('SW reg failed', e));
@@ -63,18 +76,186 @@ installBtn.addEventListener('click', async () => {
   deferredPrompt = null;
 });
 
+
+// --- AUFGABEN-LOGIK ---
 const taskInput = document.getElementById('task-input');
 const addTaskBtn = document.getElementById('add-task-btn');
 const taskList = document.getElementById('task-list');
 const emptyMessage = document.getElementById('empty-message');
 
-function getTasks(){ return JSON.parse(localStorage.getItem('tasks')||'[]'); }
-function saveTasks(t){ localStorage.setItem('tasks', JSON.stringify(t)); renderTasks(t); }
-function addTask(){ const t = taskInput.value.trim(); if(!t) return; const tasks=getTasks(); tasks.push({id:Date.now(),text:t,done:false}); saveTasks(tasks); taskInput.value=''; }
-function renderTasks(tasks){ taskList.innerHTML=''; if(tasks.length===0){ emptyMessage.classList.remove('hidden'); return; } emptyMessage.classList.add('hidden'); tasks.forEach(task=>{ const div=document.createElement('div'); div.className='p-3 border rounded flex justify-between items-center'; div.innerHTML='<div>'+task.text+'</div><button data-id="'+task.id+'" class="del text-red-500">Löschen</button>'; taskList.appendChild(div); }); }
-addTaskBtn.addEventListener('click',addTask);
-taskList.addEventListener('click', (e)=>{ if(e.target.classList.contains('del')){ const id=Number(e.target.dataset.id); saveTasks(getTasks().filter(t=>t.id!==id)); }});
-document.addEventListener('DOMContentLoaded', ()=>renderTasks(getTasks()));
+/** Holt Aufgaben aus dem localStorage */
+function getTasks(){ return JSON.parse(localStorage.getItem(TASK_STORAGE_KEY) || '[]'); }
+
+/** Speichert Aufgaben und rendert die Liste neu */
+function saveTasks(t){ 
+  localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(t)); 
+  renderTasks(t); 
+}
+
+/** Fügt eine neue Aufgabe hinzu */
+function addTask(){ 
+  const t = taskInput.value.trim(); 
+  if(!t) return; 
+  const tasks = getTasks(); 
+  // Verwenden von Date.now() als einfache ID
+  tasks.push({id: Date.now(), text: t, done: false}); 
+  saveTasks(tasks); 
+  taskInput.value = ''; 
+}
+
+/** Rendert die Aufgabenliste */
+function renderTasks(tasks){ 
+  taskList.innerHTML = ''; 
+  if(tasks.length === 0){ 
+    emptyMessage.classList.remove('hidden'); 
+    return; 
+  } 
+  emptyMessage.classList.add('hidden'); 
+  tasks.forEach(task => { 
+    const div = document.createElement('div'); 
+    // Stil für die Aufgabe
+    div.className = 'p-3 bg-gray-50 border border-indigo-200 rounded-lg flex justify-between items-center transition duration-200 hover:shadow-md'; 
+    div.innerHTML = `
+      <span class="text-gray-800">${task.text}</span>
+      <button data-id="${task.id}" class="del text-red-500 hover:text-red-700 font-medium transition duration-200">Löschen</button>
+    `;
+    taskList.appendChild(div); 
+  }); 
+}
+
+// Event Listener für Aufgaben
+addTaskBtn.addEventListener('click', addTask);
+taskInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        addTask();
+    }
+});
+taskList.addEventListener('click', (e) => { 
+  // Löschen-Funktion
+  if(e.target.classList.contains('del')){ 
+    const id = Number(e.target.dataset.id); 
+    saveTasks(getTasks().filter(t => t.id !== id)); 
+  }
+});
+
+
+// --- WETTER-LOGIK ---
+const cityInput = document.getElementById('city-input');
+const changeCityBtn = document.getElementById('change-city-btn');
+const getLocationBtn = document.getElementById('get-location-btn');
+const weatherDisplay = document.getElementById('weather-display');
+const weatherLoading = document.getElementById('weather-loading');
+const beeWarning = document.getElementById('bee-warning');
+
+/** Rendert die Wetterdaten in der Anzeige */
+function renderWeather(data) {
+  weatherDisplay.innerHTML = `
+    <div class="flex items-center space-x-4">
+      <img src="https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png" alt="${data.weather[0].description}" class="w-16 h-16">
+      <div>
+        <p class="text-3xl font-bold text-gray-900">${Math.round(data.main.temp)}°C</p>
+        <p class="text-lg text-gray-700">${data.name}, ${data.sys.country}</p>
+        <p class="text-sm text-gray-600">${data.weather[0].description.charAt(0).toUpperCase() + data.weather[0].description.slice(1)}</p>
+      </div>
+    </div>
+  `;
+
+  // Bienen-Warnung (Beispiel für > 30°C Hitze)
+  if (data.main.temp > 30) {
+    beeWarning.innerHTML = '<strong>Hitzewarnung:</strong> Über $30\text{°C}$! Bitte auf die Bienen achten und Wasser bereitstellen.';
+    beeWarning.classList.remove('hidden');
+  } else {
+    beeWarning.classList.add('hidden');
+  }
+}
+
+/** Zeigt eine Fehlermeldung an */
+function displayError(message) {
+  weatherDisplay.innerHTML = `<p class="text-red-600 font-semibold p-2 bg-red-50 rounded">${message}</p>`;
+  beeWarning.classList.add('hidden');
+}
+
+/** Holt Wetterdaten von der API */
+async function fetchWeather(query) {
+  // Der API-Key Check ist hier nicht mehr nötig, da der Schlüssel nun eingesetzt ist.
+  
+  weatherDisplay.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin-fast rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500"></div></div>';
+
+  let url;
+  if (query.city) {
+    url = `${WEATHER_API_URL}?q=${query.city}&appid=${WEATHER_API_KEY}&units=metric&lang=de`;
+    localStorage.setItem(WEATHER_CITY_KEY, query.city);
+  } else if (query.lat && query.lon) {
+    url = `${WEATHER_API_URL}?lat=${query.lat}&lon=${query.lon}&appid=${WEATHER_API_KEY}&units=metric&lang=de`;
+    localStorage.removeItem(WEATHER_CITY_KEY);
+  } else {
+    return; // Nichts zu tun
+  }
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.cod === 200) {
+      renderWeather(data);
+    } else {
+      displayError(`Wetterdaten für ${query.city || 'den Standort'} konnten nicht gefunden werden. (${data.message})`);
+    }
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Wetterdaten:', error);
+    displayError('Fehler: Konnte keine Verbindung zum Wetterdienst herstellen.');
+  }
+}
+
+/** Wetter per Stadtname ändern */
+function handleCityChange() {
+  const city = cityInput.value.trim();
+  if (city) {
+    fetchWeather({ city });
+    cityInput.value = '';
+  }
+}
+
+/** Wetter per Geolocation laden */
+function handleGeolocation() {
+  weatherDisplay.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin-fast rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500"></div></div>';
+  
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        fetchWeather({ 
+          lat: position.coords.latitude, 
+          lon: position.coords.longitude 
+        });
+      },
+      (error) => {
+        console.error('Geolocation Fehler:', error);
+        displayError('Standort konnte nicht abgerufen werden. Bitte geben Sie manuell eine Stadt ein.');
+      }
+    );
+  } else {
+    displayError('Geolocation wird von diesem Browser nicht unterstützt.');
+  }
+}
+
+// Event Listener für Wetter
+changeCityBtn.addEventListener('click', handleCityChange);
+cityInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        handleCityChange();
+    }
+});
+getLocationBtn.addEventListener('click', handleGeolocation);
+
+// --- INITIALISIERUNG ---
+document.addEventListener('DOMContentLoaded', () => {
+  // Aufgaben laden
+  renderTasks(getTasks());
+
+  // Wetter beim Start laden (zuletzt gespeicherte Stadt oder Standard)
+  const lastCity = localStorage.getItem(WEATHER_CITY_KEY);
+  fetchWeather({ city: lastCity || DEFAULT_CITY });
+});
 </script>
 </body>
 </html>
